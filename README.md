@@ -1,7 +1,7 @@
 SHELL BOT PARA TELEGRAM
 =======================
 
-###Instalación
+### Instalación
 - Enviar un mensaje a @botfather a través de telegram para registrar el bot que 
 usaŕas para controlar tu equipo. Este proporcionará la API_KEY para el 
 funcionamiento de ese bot.
