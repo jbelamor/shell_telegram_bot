@@ -1,52 +1,73 @@
-import subprocess
+import argparse
+from os import getcwd, chdir
 import telebot
-import config
+import subprocess
+from getpass import getuser
+import platform
 
-bot = telebot.TeleBot(config.apikey)
+#args parser
+def to_list(admins):
+    return [x.strip() for x in admins.split(',')]
+parser = argparse.ArgumentParser(description='Control your server or computer trought telegram.')
+parser.add_argument('--api-key', required=True)
+parser.add_argument('--admins', required=True, type=to_list)
+args = parser.parse_args()
+
+#initialization 
+os = platform.system()
+if os=='Windows':
+    get_working_directory = 'cd'
+    concat_symbol = ' & '
+elif os=='Linux':
+    get_working_directory = 'pwd'
+    concat_symbol = ' ; '    
+
+machine_user = getuser()
+working_directory = getcwd()
 users = {}
+bot = telebot.TeleBot(args.api_key)
 
-@bot.message_handler(commands=['start'])
-def hello_user(m):
-    if m.chat.id not in users.keys():
-        users[m.chat.id] = {'username': m.chat.username}
-    bot.send_message(m.chat.id, 'Welcome user. This bot will help you to manage a server running\
-    shell comands througt it.\n If you experiment any issue or have\
-    any suggestion, just let me know.\n Made with <3 @Joex23.')
-    print(users)
-            
+#main content
 @bot.message_handler(commands=['repeat_command'])
 def repeat_command(m):
-    print(users)
+    user = m.from_user.username
     try:
-        m.text = users[m.chat.id]['last_command']
+        m.text = users[user]['commands_list'][-1]
         execute_command(m)
     except:
         bot.send_message(m.chat.id, 'You haven\'t executed any command yet.')
 
+        
 @bot.message_handler(func=lambda m: True)
 def execute_command(m):
+    user = m.from_user.username
 #    print(m)
-    print(users)
-    if m.chat.id!=config.myid:
+    if user not in args.admins:
+        bot.reply_to(m, 'No eres uno de los administradores. Cierra la puerta al salir')
         return
-    try:
-        users[m.chat.id]['last_command'] = m.text
-        command=m.text.split('/')[1]
-        print(command)
-    except:
-        bot.send_message(m.chat.id, 'Commands should start with "/"')
-        return    
-    result=subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    print(result.returncode)
-    print(result.stdout)
-    print(result.stderr)
+    if user not in users.keys():
+        users[user] = {'username': user, 'wd': working_directory}
+        users[user]['commands_list'] = []
+        bot.reply_to(m, '[bot]> Se te ha dado de alta en la lista de usuarios')
+    prompt = '['+user+'@'+machine_user+']> ' + m.text + '\n'
+    prepared_command='cd ' + users[user]['wd'] + concat_symbol + '{}' + concat_symbol + get_working_directory
+    result=subprocess.run(prepared_command.format(m.text), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if result.returncode is 0:
-        bot.send_message(m.chat.id, '```\n'+result.stdout.decode('utf-8')+'```', parse_mode='Markdown')
+        output=result.stdout.decode('utf-8')[:-1]
+        bot.reply_to(m, '```\n'+prompt+(output[:output.rfind('\n')] if output.find('\n') != -1 else '')+'```', parse_mode='Markdown')
+        users[user]['wd'] = output[output.rfind('\n')+1:]
+        users[user]['commands_list'].append(m.text)
     else:
         try:
-            bot.send_message(m.chat.id, '```\n'+result.stderr.decode('utf-8')+'```', parse_mode='Markdown')
+            output=result.stderr.decode('utf-8')[:-1]
+            bot.reply_to(m, '```\n'+prompt+output[:output.rfind('\n')]+'```', parse_mode='Markdown')
+            if result.returncode != 127:
+                users[user]['wd'] = output[output.rfind('\n')+1:]
+                users[user]['commands_list'].append(m.text)
         except:
-            bot.send_message(m.chat.id, '`Your command didn\'t return nothing.`', parse_mode='Markdown')
+            bot.reply_to(m, '`Your command didn\'t return nothing.`', parse_mode='Markdown')        
 
+            
 print('Running')
+
 bot.polling()
