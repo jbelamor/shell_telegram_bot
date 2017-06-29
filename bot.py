@@ -1,5 +1,5 @@
 import argparse
-from os import getcwd, chdir
+from os import getcwd, path
 import telebot
 import subprocess
 from getpass import getuser
@@ -12,6 +12,12 @@ parser = argparse.ArgumentParser(description='Control your server or computer tr
 parser.add_argument('--api-key', required=True)
 parser.add_argument('--admins', required=True, type=to_list)
 args = parser.parse_args()
+
+#create auxiliar script
+if path.isfile('script_aux.sh'):
+    with open('script_aux.sh', 'w') as script:
+        script.write('cd $1;eval $2;error=$?;echo `pwd`;exit $error')
+        script.close()
 
 #initialization 
 os = platform.system()
@@ -26,6 +32,7 @@ machine_user = getuser()
 working_directory = getcwd()
 users = {}
 bot = telebot.TeleBot(args.api_key)
+
 
 #main content
 @bot.message_handler(commands=['repeat_command'])
@@ -50,8 +57,10 @@ def execute_command(m):
         users[user]['commands_list'] = []
         bot.reply_to(m, '[bot]> Se te ha dado de alta en la lista de usuarios')
     prompt = '['+user+'@'+machine_user+']> ' + m.text + '\n'
-    prepared_command='cd ' + users[user]['wd'] + concat_symbol + '{}' + concat_symbol + get_working_directory
-    result=subprocess.run(prepared_command.format(m.text), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    wd=users[user]['wd']
+    prep='./script_aux.sh "{}" "{}"'.format(wd, m.text)
+#    print(prep)
+    result=subprocess.run(prep, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if result.returncode is 0:
         output=result.stdout.decode('utf-8')[:-1]
         bot.reply_to(m, '```\n'+prompt+(output[:output.rfind('\n')] if output.find('\n') != -1 else '')+'```', parse_mode='Markdown')
@@ -59,8 +68,8 @@ def execute_command(m):
         users[user]['commands_list'].append(m.text)
     else:
         try:
-            output=result.stderr.decode('utf-8')[:-1]
-            bot.reply_to(m, '```\n'+prompt+output[:output.rfind('\n')]+'```', parse_mode='Markdown')
+            output=result.stderr.decode('utf-8')
+            bot.reply_to(m, '```\n'+prompt+(output[:output.rfind('\n')] if output.find('\n') != -1 else '')+'```', parse_mode='Markdown')
             if result.returncode != 127:
                 users[user]['wd'] = output[output.rfind('\n')+1:]
                 users[user]['commands_list'].append(m.text)
