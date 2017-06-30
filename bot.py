@@ -24,7 +24,7 @@ os = platform.system()
 if os=='Windows':
     get_working_directory = 'cd'
     concat_symbol = ' & '
-elif os=='Linux':
+elif os=='Linux' or os=='Darwin':
     get_working_directory = 'pwd'
     concat_symbol = ' ; '    
 
