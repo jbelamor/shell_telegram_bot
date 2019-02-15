@@ -1,0 +1,1 @@
+cd $1;eval $2;error=$?;echo `pwd`;exit $error
