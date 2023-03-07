@@ -4,6 +4,7 @@ import telebot
 import subprocess
 from getpass import getuser
 import platform
+import datetime
 import requests
 
 #args parser
@@ -50,6 +51,37 @@ def repeat_command(m):
 def get_public_ip(m):
     r = requests.get('https://ifconfig.me/ip')
     bot.send_message(m.chat.id, r.content)
+
+@bot.message_handler(func=lambda m: True, content_types=['audio', 'voice'])
+def handle_audio_or_voice(m):
+    file = None
+    if m.content_type == 'audio':
+        file = m.audio
+    elif m.content_type == 'voice':
+        file = m.voice
+
+    file_info = bot.get_file(file.file_id)
+    downloaded_file = bot.download_file(file_info.file_path)
+
+    file_name = file.file_name
+    if file_name is None:
+        file_extension = get_extension(file.mime_type)
+        file_name = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + file_extension
+    else:
+        file_extension = os.path.splitext(file_name)[1]
+
+    with open(file_name, 'wb') as new_file:
+        new_file.write(downloaded_file)
+
+def get_extension(mime_type):
+    if mime_type == 'audio/ogg':
+        return '.ogg'
+    elif mime_type == 'audio/wav':
+        return '.wav'
+    elif mime_type == 'audio/mpeg':
+        return '.mp3'
+    else:
+        return ''
 
 @bot.message_handler(func=lambda m: True)
 def execute_command(m):
