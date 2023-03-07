@@ -1,9 +1,10 @@
 import argparse
-from os import getcwd, path
+from os import getcwd, path, chmod
 import telebot
 import subprocess
 from getpass import getuser
 import platform
+import requests
 
 #args parser
 def to_list(admins):
@@ -13,26 +14,27 @@ parser.add_argument('--api-key', required=True)
 parser.add_argument('--admins', required=True, type=to_list)
 args = parser.parse_args()
 
-#create auxiliar script
-if path.isfile('script_aux.sh'):
-    with open('script_aux.sh', 'w') as script:
-        script.write('cd $1;eval $2;error=$?;echo `pwd`;exit $error')
-        script.close()
-
 #initialization 
 os = platform.system()
 if os=='Windows':
     get_working_directory = 'cd'
     concat_symbol = ' & '
+    aux_script_path = 'C:\Temp\script_aux.bat'
 elif os=='Linux':
     get_working_directory = 'pwd'
-    concat_symbol = ' ; '    
+    concat_symbol = ' ; '
+    aux_script_path = '/usr/local/bin/script_aux.sh'
+    #create auxiliar script
+    if not path.isfile(aux_script_path):
+        with open(aux_script_path, 'w') as script:
+            script.write('cd $1;eval $2;error=$?;echo `pwd`;exit $error')
+            script.close()
+            chmod(aux_script_path, 0o700)
 
 machine_user = getuser()
 working_directory = getcwd()
 users = {}
 bot = telebot.TeleBot(args.api_key)
-
 
 #main content
 @bot.message_handler(commands=['repeat_command'])
@@ -44,9 +46,14 @@ def repeat_command(m):
     except:
         bot.send_message(m.chat.id, 'You haven\'t executed any command yet.')
 
-        
+@bot.message_handler(commands=['ip'])
+def get_public_ip(m):
+    r = requests.get('https://ifconfig.me/ip')
+    bot.send_message(m.chat.id, r.content)
+
 @bot.message_handler(func=lambda m: True)
 def execute_command(m):
+    print(m)
     user = m.from_user.username
 #    print(m)
     if user not in args.admins:
@@ -57,8 +64,8 @@ def execute_command(m):
         users[user]['commands_list'] = []
         bot.reply_to(m, '[bot]> Se te ha dado de alta en la lista de usuarios')
     prompt = '['+user+'@'+machine_user+']> ' + m.text + '\n'
-    wd=users[user]['wd']
-    prep='./script_aux.sh "{}" "{}"'.format(wd, m.text)
+    wd = users[user]['wd']
+    prep = '{} "{}" "{}"'.format(aux_script_path, wd, m.text)
 #    print(prep)
     result=subprocess.run(prep, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if result.returncode is 0:
