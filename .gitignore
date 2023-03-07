@@ -1,1 +1,3 @@
-telegram_shell.sh
+launch_bot.sh
+*.ogg*
+audios/*
