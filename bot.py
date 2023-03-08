@@ -1,11 +1,12 @@
 import argparse
-from os import getcwd, path, chmod
+from os import getcwd, path, chmod, makedirs
 import telebot
 import subprocess
 from getpass import getuser
 import platform
 import datetime
 import requests
+from audio_parser import Audio_parser
 
 #args parser
 def to_list(admins):
@@ -35,7 +36,9 @@ elif os=='Linux':
 machine_user = getuser()
 working_directory = getcwd()
 users = {}
+audios_dir = 'audios'
 bot = telebot.TeleBot(args.api_key)
+audios_parser = Audio_parser()
 
 #main content
 @bot.message_handler(commands=['repeat_command'])
@@ -54,24 +57,41 @@ def get_public_ip(m):
 
 @bot.message_handler(func=lambda m: True, content_types=['audio', 'voice'])
 def handle_audio_or_voice(m):
+    print('Audio received')
+    print(m)
+    username = m.from_user.username
+    user_id = m.from_user.id
+    user_audios_path = '{}/{}_{}/'.format(audios_dir, username, user_id)
+
     file = None
     if m.content_type == 'audio':
         file = m.audio
     elif m.content_type == 'voice':
         file = m.voice
 
+    print('Downloading file...')
     file_info = bot.get_file(file.file_id)
     downloaded_file = bot.download_file(file_info.file_path)
-
+    
     file_name = file.file_name
     if file_name is None:
         file_extension = get_extension(file.mime_type)
         file_name = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + file_extension
-    else:
-        file_extension = os.path.splitext(file_name)[1]
+    
+    if not path.exists(user_audios_path):
+        makedirs(user_audios_path)
 
-    with open(file_name, 'wb') as new_file:
+    full_file_path = user_audios_path + file_name
+
+    with open(full_file_path, 'wb') as new_file:
         new_file.write(downloaded_file)
+    print('Parsing audio... This will take a while')
+    try:
+        parsed_text = audios_parser.parse_audio(full_file_path)
+    except:
+        parsed_text = 'There was an error'
+    print(parsed_text)
+    bot.reply_to(m, parsed_text)
 
 def get_extension(mime_type):
     if mime_type == 'audio/ogg':
