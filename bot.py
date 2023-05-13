@@ -119,8 +119,8 @@ def execute_command(m):
     wd = users[user]['wd']
     prep = '{} "{}" "{}"'.format(aux_script_path, wd, m.text)
 #    print(prep)
-    result=subprocess.run(prep, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if result.returncode is 0:
+    result = subprocess.run(prep, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode == 0:
         output=result.stdout.decode('utf-8')[:-1]
         bot.reply_to(m, '```\n'+prompt+(output[:output.rfind('\n')] if output.find('\n') != -1 else '')+'```', parse_mode='Markdown')
         users[user]['wd'] = output[output.rfind('\n')+1:]
@@ -135,7 +135,5 @@ def execute_command(m):
         except:
             bot.reply_to(m, '`Your command didn\'t return nothing.`', parse_mode='Markdown')        
 
-            
 print('Running')
-
 bot.polling()
